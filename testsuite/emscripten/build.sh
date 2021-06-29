@@ -27,7 +27,6 @@ fi
 while [ $# -gt 0 ]; do
   case $1 in
   --wasm-bigint) WASM_BIGINT=true ;;
-  --debug) DEBUG=true ;;
   *)
     echo "ERROR: Unknown parameter: $1" >&2
     exit 1
@@ -41,9 +40,6 @@ export CFLAGS="-O3 -fPIC"
 if [ "$WASM_BIGINT" = "true" ]; then
   # We need to detect WASM_BIGINT support at compile time
   export CFLAGS+=" -DWASM_BIGINT"
-fi
-if [ "$DEBUG" = "true" ]; then
-  export CFLAGS+=" -DDEBUG_F"
 fi
 export CXXFLAGS="$CFLAGS"
 

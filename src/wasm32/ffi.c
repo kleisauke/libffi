@@ -32,28 +32,15 @@
 
 #include <emscripten/emscripten.h>
 
-#ifdef DEBUG_F
-#define LOG_DEBUG(args...)  \
-  console.warn(`====LIBFFI(line __LINE__)`, args)
-#else
-#define LOG_DEBUG(args...) 0
-#endif
-
 #define EM_JS_MACROS(ret, name, args, body...) EM_JS(ret, name, args, body)
 
 #if WASM_BIGINT
 EM_JS_DEPS(libffi, "$getWasmTableEntry,$setWasmTableEntry,$getEmptyTableSlot,$convertJsFunctionToWasm");
-#define CALL_FUNCTION_POINTER(ptr, args...) \
-  (LOG_DEBUG("CALL_FUNC_PTR", ptr, args),   \
-  getWasmTableEntry(ptr).apply(null, args))
-
+#define CALL_FUNCTION_POINTER(ptr, args) getWasmTableEntry(ptr).apply(null, args)
 #define JS_FUNCTION_TO_WASM convertJsFunctionToWasm
 #else
 EM_JS_DEPS(libffi, "$getWasmTableEntry,$setWasmTableEntry,$getEmptyTableSlot,$convertJsFunctionToWasm,$dynCall,$generateFuncType,$uleb128Encode");
-#define CALL_FUNCTION_POINTER(ptr, args...)     \
-  (LOG_DEBUG("CALL_FUNC_PTR", sig, ptr, args),  \
-  dynCall(sig, ptr, args))
-
+#define CALL_FUNCTION_POINTER(ptr, args) dynCall(sig, ptr, args)
 #define JS_FUNCTION_TO_WASM createLegalizerWrapper
 #endif
 
@@ -235,10 +222,10 @@ ffi_call_js, (ffi_cif *cif, ffi_fp fn, void *rvalue, void **avalue),
     ret_by_arg = true;
   }
 
-  SIG(var sig = "");
+  SIG(var sig = '');
 
 #if !WASM_BIGINT
-  switch(rtype_id) {
+  switch (rtype_id) {
   case FFI_TYPE_VOID:
     SIG(sig = 'v');
     break;
@@ -316,26 +303,26 @@ ffi_call_js, (ffi_cif *cif, ffi_fp fn, void *rvalue, void **avalue),
       break;
     case FFI_TYPE_UINT64:
     case FFI_TYPE_SINT64:
-      #if WASM_BIGINT
+#if WASM_BIGINT
       args.push(DEREF_U64(arg_ptr, 0));
-      #else
+#else
       args.push(DEREF_U32(arg_ptr, 0));
       args.push(DEREF_U32(arg_ptr, 1));
-      #endif
+#endif
       SIG(sig += 'j');
       break;
     case FFI_TYPE_LONGDOUBLE:
       // long double is passed as a pair of BigInts.
-      #if WASM_BIGINT
+#if WASM_BIGINT
       args.push(DEREF_U64(arg_ptr, 0));
       args.push(DEREF_U64(arg_ptr, 1));
-      #else
+#else
       args.push(DEREF_U32(arg_ptr, 0));
       args.push(DEREF_U32(arg_ptr, 1));
       args.push(DEREF_U32(arg_ptr, 2));
       args.push(DEREF_U32(arg_ptr, 3));
-      #endif
-      SIG(sig += "jj");
+#endif
+      SIG(sig += 'jj');
       break;
     case FFI_TYPE_STRUCT:
       // Nontrivial structs are passed by pointer.
@@ -472,12 +459,12 @@ ffi_call_js, (ffi_cif *cif, ffi_fp fn, void *rvalue, void **avalue),
     break;
   case FFI_TYPE_UINT64:
   case FFI_TYPE_SINT64:
-    #if WASM_BIGINT
+#if WASM_BIGINT
     DEREF_U64(rvalue, 0) = result;
-    #else
+#else
     DEREF_U32(rvalue, 0) = result;
     DEREF_U32(rvalue, 1) = getTempRet0();
-    #endif
+#endif
     break;
   case FFI_TYPE_COMPLEX:
     throw new Error('complex ret marshalling nyi');
@@ -525,7 +512,6 @@ ffi_closure_free(void *closure) {
 }
 
 #if !WASM_BIGINT
-
 // When !WASM_BIGINT, we assume there is no JS bigint integration, so JavaScript
 // functions cannot take 64 bit integer arguments.
 //
@@ -537,7 +523,7 @@ ffi_closure_free(void *closure) {
 // This is basically the reverse of the Emscripten function
 // createDyncallWrapper.
 EM_JS(void, createLegalizerWrapper, (int trampoline, int sig), {
-  if(!sig.includes("j")) {
+  if (!sig.includes('j')) {
     return convertJsFunctionToWasm(trampoline, sig);
   }
   var sections = [];
@@ -548,18 +534,18 @@ EM_JS(void, createLegalizerWrapper, (int trampoline, int sig), {
   sections.push(prelude);
   var wrappersig = [
     // if return type is j, we will put the upper 32 bits into tempRet0.
-    sig[0].replace("j", "i"),
+    sig[0].replace('j', 'i'),
     // in the rest of the argument list, one 64 bit integer is legalized into
     // two 32 bit integers.
-    sig.slice(1).replace(/j/g, "ii"),
-  ].join("");
+    sig.slice(1).replace(/j/g, 'ii'),
+  ].join('');
 
   var typeSectionBody = [
     0x03, // number of types = 3
   ];
   generateFuncType(wrappersig, typeSectionBody); // The signature of the wrapper we are generating
   generateFuncType(sig, typeSectionBody); // the signature of the function pointer we will call
-  generateFuncType("i", typeSectionBody); // the signature of getTempRet0
+  generateFuncType('i', typeSectionBody); // the signature of getTempRet0
 
   var typeSection = [0x01 /* Type section code */];
   uleb128Encode(typeSectionBody.length, typeSection); // length of section in bytes
@@ -610,7 +596,7 @@ EM_JS(void, createLegalizerWrapper, (int trampoline, int sig), {
   }
 
   for (var i = 1; i < sig.length; i++) {
-    if (sig[i] == "j") {
+    if (sig[i] == 'j') {
       localGet(i - 1);
       convert_code.push(
         0xa7 // i32.wrap_i64
@@ -628,7 +614,7 @@ EM_JS(void, createLegalizerWrapper, (int trampoline, int sig), {
   convert_code.push(
     0x10, 0x01 // call f
   );
-  if (sig[0] === "j") {
+  if (sig[0] === 'j') {
     // Need to reassemble a 64 bit integer. Lower 32 bits is on stack. Upper 32
     // bits we get from getTempRet0
     convert_code.push(
@@ -759,9 +745,8 @@ ffi_prep_closure_loc_js,
   }
   if (nfixedargs < nargs) {
     // extra pointer to varargs stack
-    sig += "i";
+    sig += 'i';
   }
-  LOG_DEBUG("CREATE_CLOSURE",  "sig:", sig);
   function trampoline() {
     var args = Array.prototype.slice.call(arguments);
     var size = 0;
@@ -838,23 +823,23 @@ ffi_prep_closure_loc_js,
       case FFI_TYPE_SINT64:
         STACK_ALLOC(cur_ptr, 8, 8);
         DEREF_U32(args_ptr, carg_idx) = cur_ptr;
-        #if WASM_BIGINT
+#if WASM_BIGINT
         DEREF_U64(cur_ptr, 0) = cur_arg;
-        #else
+#else
         // Bigint arg was split by legalizer adaptor
         DEREF_U32(cur_ptr, 0) = cur_arg;
         cur_arg = args[jsarg_idx++];
         DEREF_U32(cur_ptr, 1) = cur_arg;
-        #endif
+#endif
         break;
       case FFI_TYPE_LONGDOUBLE:
         STACK_ALLOC(cur_ptr, 16, 8);
         DEREF_U32(args_ptr, carg_idx) = cur_ptr;
-        #if WASM_BIGINT
+#if WASM_BIGINT
         DEREF_U64(cur_ptr, 0) = cur_arg;
         cur_arg = args[jsarg_idx++];
         DEREF_U64(cur_ptr, 1) = cur_arg;
-        #else
+#else
         // Was split by legalizer adaptor
         DEREF_U32(cur_ptr, 0) = cur_arg;
         cur_arg = args[jsarg_idx++];
@@ -863,7 +848,7 @@ ffi_prep_closure_loc_js,
         DEREF_U32(cur_ptr, 2) = cur_arg;
         cur_arg = args[jsarg_idx++];
         DEREF_U32(cur_ptr, 3) = cur_arg;
-        #endif
+#endif
         break;
       }
     }
@@ -895,7 +880,6 @@ ffi_prep_closure_loc_js,
     }
     stackRestore(cur_ptr);
     stackAlloc(0); // stackAlloc enforces alignment invariants on the stack pointer
-    LOG_DEBUG("CALL_CLOSURE",  "closure:", closure, "fptr", CLOSURE__fun(closure), "cif",  CLOSURE__cif(closure));
     getWasmTableEntry(CLOSURE__fun(closure))(
         CLOSURE__cif(closure), ret_ptr, args_ptr,
         CLOSURE__user_data(closure)
@@ -905,20 +889,20 @@ ffi_prep_closure_loc_js,
     // If we aren't supposed to return by argument, figure out what to return.
     if (!ret_by_arg) {
       switch (sig[0]) {
-      case "i":
+      case 'i':
         return DEREF_U32(ret_ptr, 0);
-      case "j":
-        #if WASM_BIGINT
+      case 'j':
+#if WASM_BIGINT
         return DEREF_U64(ret_ptr, 0);
-        #else
+#else
         // Split the return i64, set the upper 32 bits into tempRet0 and return
         // the lower 32 bits.
         setTempRet0(DEREF_U32(ret_ptr, 1));
         return DEREF_U32(ret_ptr, 0);
-        #endif
-      case "d":
+#endif
+      case 'd':
         return DEREF_F64(ret_ptr, 0);
-      case "f":
+      case 'f':
         return DEREF_F32(ret_ptr, 0);
       }
     }

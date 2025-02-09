@@ -16,9 +16,14 @@ mkdir -p "$TARGET"
 # Define default arguments
 DEBUG=false
 
+# JS BigInt to Wasm i64 integration, enabled by default
+# https://github.com/WebAssembly/JS-BigInt-integration
+WASM_BIGINT=true
+
 # Parse arguments
 while [ $# -gt 0 ]; do
   case $1 in
+    --disable-wasm-bigint) WASM_BIGINT=false ;;
     --debug) DEBUG=true ;;
     *) echo "ERROR: Unknown parameter: $1" >&2; exit 1 ;;
   esac
@@ -27,6 +32,7 @@ done
 
 # Common compiler flags
 export CFLAGS="-O3 -fPIC"
+if [ "$WASM_BIGINT" = "true" ]; then export CFLAGS+=" -DWASM_BIGINT"; fi
 if [ "$DEBUG" = "true" ]; then export CFLAGS+=" -DDEBUG_F"; fi
 export CXXFLAGS="$CFLAGS"
 
